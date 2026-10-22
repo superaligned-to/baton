@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "rootDir": ".",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@superaligned/baton": ["./src/index.ts"],
+      "@superaligned/baton/zod": ["./src/zod.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

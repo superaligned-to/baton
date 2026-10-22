@@ -1,0 +1,12 @@
+{
+  "ignores": ["**/node_modules/**", "dist/**", "coverage/**"],
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": {
+      "allowed_elements": ["p", "picture", "source", "img"]
+    },
+    "MD040": true
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "name": "@superaligned/baton",
+  "version": "0.1.0",
+  "description": "Enforce tool dependencies with signed proofs around your existing TypeScript handlers.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "agents",
+    "ai",
+    "llm",
+    "tools",
+    "workflow",
+    "hmac",
+    "typescript"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/superaligned-to/baton#readme",
+  "bugs": "https://github.com/superaligned-to/baton/issues",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./zod": {
+      "types": "./dist/zod.d.ts",
+      "default": "./dist/zod.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/superaligned-to/baton.git"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc",
+    "lint": "pnpm lint:code && pnpm lint:md",
+    "lint:code": "biome check .",
+    "lint:md": "markdownlint-cli2 \"**/*.md\"",
+    "fix": "biome check --write .",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm coverage",
+    "prepublishOnly": "pnpm check"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.2",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "markdownlint-cli2": "0.23.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}

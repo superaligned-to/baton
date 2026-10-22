@@ -1,0 +1,129 @@
+name: release
+on:
+  push:
+    tags: ["v[0-9]*"]
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    environment: npm
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.12.1
+          registry-url: https://registry.npmjs.org
+      - name: Install the pinned npm CLI with trusted publishing support
+        run: npm install --global npm@11.20.0 --registry=https://registry.npmjs.org
+      - name: Verify the release tag and README changelog
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { execFileSync } from "node:child_process";
+          import { readFileSync } from "node:fs";
+
+          const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+
+          assert.match(
+            version,
+            /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/,
+          );
+          assert.equal(process.env.GITHUB_REF_NAME, `v${version}`);
+
+          const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
+
+          assert.equal(git("status", "--porcelain"), "", "The source tree must be clean.");
+          assert.equal(
+            git("rev-parse", "--verify", `refs/tags/v${version}^{commit}`),
+            git("rev-parse", "HEAD"),
+          );
+
+          const prefix = `### ${version} - `;
+          const headings = readFileSync("README.md", "utf8")
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith(prefix));
+
+          assert.equal(headings.length, 1, "README.md needs one dated changelog entry for this version.");
+          assert.match(headings[0].slice(prefix.length), /^\d{4}-\d{2}-\d{2}$/);
+          NODE
+      - name: Require the release commit to be on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Verify checks left the source tree clean
+        run: test -z "$(git status --porcelain)"
+      - name: Pack the checked artifact
+        id: package
+        run: |
+          npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/baton-pack.json"
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { createHash } from "node:crypto";
+          import { appendFileSync, readFileSync } from "node:fs";
+          import { join } from "node:path";
+
+          const packed = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, "baton-pack.json"), "utf8"));
+
+          assert.equal(packed.length, 1);
+
+          const { filename, integrity } = packed[0];
+          const tarball = join(process.env.RUNNER_TEMP, filename);
+          const actual = `sha512-${createHash("sha512").update(readFileSync(tarball)).digest("base64")}`;
+
+          assert.equal(integrity, actual, "The packed file must match npm's reported integrity.");
+
+          appendFileSync(process.env.GITHUB_OUTPUT, `tarball=${tarball}\nintegrity=${integrity}\n`);
+          NODE
+      - name: Check for an identical previous publication
+        id: publication
+        env:
+          PACKED_INTEGRITY: ${{ steps.package.outputs.integrity }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { appendFileSync, readFileSync } from "node:fs";
+
+          const { name, version } = JSON.parse(readFileSync("package.json", "utf8"));
+
+          const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`, {
+            signal: AbortSignal.timeout(10_000),
+          });
+
+          let published = false;
+
+          if (response.status !== 404) {
+            assert.ok(response.ok, `Registry check failed: HTTP ${response.status}.`);
+
+            const existing = await response.json();
+
+            assert.equal(existing.name, name);
+            assert.equal(existing.version, version);
+            assert.equal(
+              existing.dist?.integrity,
+              process.env.PACKED_INTEGRITY,
+              "This npm version exists with different contents. Choose a new version.",
+            );
+
+            published = true;
+          }
+
+          const distTag = version.split("+")[0].includes("-") ? "next" : "latest";
+
+          appendFileSync(process.env.GITHUB_OUTPUT, `published=${published}\ndist_tag=${distTag}\n`);
+          NODE
+      - name: Publish the checked artifact
+        if: steps.publication.outputs.published != 'true'
+        env:
+          TARBALL: ${{ steps.package.outputs.tarball }}
+          DIST_TAG: ${{ steps.publication.outputs.dist_tag }}
+        run: npm publish "$TARBALL" --ignore-scripts --provenance --access public --tag "$DIST_TAG" --registry=https://registry.npmjs.org

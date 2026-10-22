@@ -1,0 +1,10 @@
+# baton
+
+> Enforce tool dependencies around existing MCP tools and TypeScript handlers.
+
+- [README](https://github.com/superaligned-to/baton/blob/main/README.md): installation, tool dependencies, and runtime checks
+- [MCP integration](https://github.com/superaligned-to/baton/blob/main/README.md#mcp): schemas, handlers, and explicit meta-tool registration
+- [API](https://github.com/superaligned-to/baton/blob/main/README.md#api): configuration, step builders, output links, and replies
+- [Calling gated tools](https://github.com/superaligned-to/baton/blob/main/README.md#calling-gated-tools): proof tokens, refusals, and recovery
+- [Versioning](https://github.com/superaligned-to/baton/blob/main/README.md#versioning): SemVer and releases
+- [Agent instructions](https://github.com/superaligned-to/baton/blob/main/AGENTS.md): repository constraints

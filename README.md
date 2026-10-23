@@ -20,7 +20,8 @@ Agents can skip steps. Your tools don’t have to let them.
 </p>
 
 > [!NOTE]
-> The agent makes each call. Baton checks prerequisites before your handler runs.
+> **For agents:** [MCP integration](#mcp) · [Calling gated tools](#calling-gated-tools) · [Repo instructions](AGENTS.md) · [Docs index](llms.txt).
+> Keep the existing server and handlers. Pass `proof_token` unchanged and follow the reply’s `Next:` guidance.
 
 ## Install
 

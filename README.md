@@ -6,18 +6,18 @@
 
 **Enforce tool dependencies without building another agent framework.**
 
-Agents can skip steps. Your tools don’t have to let them.
-
-- Require a read before an edit.
-- Require tests and review before a release.
-- Bind publishing to the exact artifact that passed its checks.
-
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/workflow.png">
     <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/workflow.gif" alt="Agents share an MCP server that requires build, test, and review before publishing." width="1040">
   </picture>
 </p>
+
+Agents can skip steps. Your tools don’t have to let them.
+
+- Require a read before an edit.
+- Require tests and review before a release.
+- Bind publishing to the exact artifact that passed its checks.
 
 > [!NOTE]
 > **For agents:** [MCP integration](#mcp) · [Calling gated tools](#calling-gated-tools) · [Repo instructions](AGENTS.md) · [Docs index](llms.txt).

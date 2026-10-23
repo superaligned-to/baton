@@ -44,7 +44,7 @@ Use the same secret in every process serving a flow. Changing it invalidates exi
 
 ## Read before editing
 
-Wrap the handlers, then pass the returned proof to the next call. `from` binds the edit to the document that was read.
+Import the core directly; Zod is not required. Wrap the handlers, then pass the returned proof to the next call. `from` binds the edit to the document that was read.
 
 ```ts
 import { readFile, writeFile } from "node:fs/promises";
@@ -116,11 +116,84 @@ Plain replies contain `result`, `proof_token`, and `next`. Refusals throw `Baton
 
 ## MCP
 
+Set `mcp: true` to return MCP results with proof and next-call guidance. Choose the import that fits your server:
+
+| Import | Schemas and registration |
+| --- | --- |
+| `@superaligned/baton` | Your server supplies and validates schemas, including `proof_token` |
+| `@superaligned/baton/zod` | Optional Zod 4 adapter adds `proof_token` to `.schema(...)` and provides `metaTools()` |
+
+### With your own schemas
+
+This exports tool definitions and handlers for a server that accepts JSON Schema. A failed check issues no proof; publishing requires the exact text from a successful check.
+
+```ts
+import { writeFile } from "node:fs/promises";
+import { baton } from "@superaligned/baton";
+
+const flow = baton({
+  name: "publish-document",
+  secret: process.env.BATON_SECRET ?? "",
+  mcp: true,
+});
+
+const check = flow
+  .step("check_doc")
+  .description("Check that the document starts with a Markdown heading.")
+  .func(({ text }: { text: string }) => ({
+    content: [
+      {
+        type: "text" as const,
+        text: text.startsWith("# ") ? "Check passed." : "Add a Markdown heading.",
+      },
+    ],
+    structuredContent: { text },
+    isError: !text.startsWith("# "),
+  }));
+
+const publish = flow
+  .step("publish_doc", {
+    from: { text: check.output((result) => result.structuredContent.text) },
+  })
+  .description("Publish the exact text that passed its check.")
+  .func(async ({ text }: { text: string }) => {
+    await writeFile("published.md", text);
+
+    return { content: [{ type: "text" as const, text: "Document published." }] };
+  });
+
+const inputSchema = {
+  type: "object" as const,
+  properties: {
+    text: { type: "string" },
+    proof_token: {
+      anyOf: [
+        { type: "string" },
+        { type: "array", items: { type: "string" }, minItems: 1 },
+      ],
+    },
+  },
+  required: ["text"],
+  additionalProperties: false,
+};
+
+export const tools = [check, publish].map((tool) => ({
+  name: tool.name,
+  description: tool.description,
+  inputSchema,
+  func: tool.func,
+}));
+```
+
+Expose each tool's `name`, `description`, and `inputSchema` through your existing registration code. Validate arguments with your server's validator, then pass them to `func`, including `proof_token`. Keep that field optional so Baton can explain missing proof. The core also exposes `flow.status`, `flow.list`, and `flow.refresh` for manual registration.
+
+### With Zod 4
+
 1. Import `baton` from `@superaligned/baton/zod` for Zod 4 schemas and set `mcp: true`.
 2. Pass application fields to `.schema(shape)`; baton adds `proof_token`.
 3. Register each handle’s `name`, `description`, `schema`, and `func` with your existing server. Register `flow.metaTools()` the same way.
 
-Keep your transport and ungated tools. The core supports MCP with your host’s schemas too.
+Keep your transport and ungated tools. This adapter uses your application's Zod 4 installation.
 
 This registers two tools on your existing server. The check returns the exact text that publishing must use; a failed check routes back to another check.
 

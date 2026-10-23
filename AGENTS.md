@@ -2,7 +2,7 @@
 
 baton is a TypeScript library for enforcing dependencies between existing tool handlers.
 
-The [README](README.md) contains the integration guide, API, token recovery, and release process. Use its [MCP guide](README.md#mcp) when adding baton to an existing server, and [calling instructions](README.md#calling-gated-tools) when using gated tools.
+The [README](README.md) contains the integration guide, API, token recovery, and versioning policy. Use its [MCP guide](README.md#mcp) when adding baton to an existing server, and [calling instructions](README.md#calling-gated-tools) when using gated tools.
 
 ## Working on baton
 
@@ -16,3 +16,11 @@ The [README](README.md) contains the integration guide, API, token recovery, and
 - Keep secrets in environment variables. Host applications check current state and protect duplicate side effects.
 
 Biome checks TypeScript and JSON; markdownlint checks Markdown. Repository tests check package contents, source module size, and YAML, including GitHub workflows and the lockfile.
+
+## Releasing
+
+1. Start from a clean `main`. Update `package.json` with `npm version patch --no-git-tag-version` (or `minor` / `major`), following the README’s versioning policy.
+2. Add a dated `### X.Y.Z - YYYY-MM-DD` entry under the README’s Changelog and run `pnpm check`.
+3. Commit and push, then create and push the matching annotated `vX.Y.Z` tag.
+
+The `release.yml` workflow requires GitHub Actions and npm trusted publishing. Prereleases use `next`; stable releases use `latest`. An existing version is accepted only if its package integrity matches.

@@ -42,6 +42,44 @@ export BATON_SECRET="$(openssl rand -base64 32)"
 
 Use the same secret in every process serving a flow. Changing it invalidates existing tokens.
 
+## Read before editing
+
+Wrap the handlers, then pass the returned proof to the next call. `from` binds the edit to the document that was read.
+
+```ts
+import { readFile, writeFile } from "node:fs/promises";
+import { baton } from "@superaligned/baton";
+
+const flow = baton({ name: "edit-document", secret: process.env.BATON_SECRET ?? "" });
+
+const read = flow
+  .step("read_doc")
+  .description("Read a document before editing it.")
+  .func(async ({ doc }: { doc: string }) => ({
+    doc,
+    text: await readFile(doc, "utf8"),
+  }));
+
+const edit = flow
+  .step("edit_doc", { from: { doc: read.output((result) => result.doc) } })
+  .description("Edit the document that was read.")
+  .func(async ({ doc, text }: { doc: string; text: string }) => {
+    await writeFile(doc, text);
+
+    return { doc, text };
+  });
+
+const opened = await read({ doc: "notes.md" });
+
+await edit({
+  doc: "notes.md",
+  text: `${opened.result.text}\nUpdated.\n`,
+  proof_token: opened.proof_token,
+});
+```
+
+Calling `edit` without proof, or with a different `doc`, is refused before `writeFile` runs. `notes.md` must exist before running this example.
+
 ## API
 
 Create a flow with `baton({ name, secret })` from `@superaligned/baton`. Wrap handlers with `flow.step(name, options).description(text).func(handler)`.
@@ -83,6 +121,66 @@ Plain replies contain `result`, `proof_token`, and `next`. Refusals throw `Baton
 3. Register each handle’s `name`, `description`, `schema`, and `func` with your existing server. Register `flow.metaTools()` the same way.
 
 Keep your transport and ungated tools. The core supports MCP with your host’s schemas too.
+
+This registers two tools on your existing server. The check returns the exact text that publishing must use; a failed check routes back to another check.
+
+```ts
+import { writeFile } from "node:fs/promises";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { baton } from "@superaligned/baton/zod";
+import { z } from "zod";
+
+export function registerDocumentTools(server: McpServer) {
+  const flow = baton({
+    name: "publish-document",
+    secret: process.env.BATON_SECRET ?? "",
+    mcp: true,
+  });
+
+  const check = flow
+    .step("check_doc")
+    .description("Check that the document starts with a Markdown heading.")
+    .schema({ text: z.string() })
+    .func(({ text }) => ({
+      content: [{ type: "text" as const, text: "Document checked." }],
+      structuredContent: { text, passed: text.startsWith("# ") },
+    }));
+
+  const publish = flow
+    .step("publish_doc", {
+      from: { text: check.output((result) => result.structuredContent.text) },
+    })
+    .description("Publish the exact text that passed its check.")
+    .schema({ text: z.string() })
+    .func(async ({ text }) => {
+      await writeFile("published.md", text);
+
+      return { content: [{ type: "text" as const, text: "Document published." }] };
+    });
+
+  check.branch({
+    when: (result) => result.structuredContent.passed,
+    pass: publish,
+    fail: check,
+  });
+
+  server.registerTool(
+    check.name,
+    { description: check.description, inputSchema: check.schema },
+    check.func,
+  );
+
+  for (const tool of [publish, ...flow.metaTools()]) {
+    server.registerTool(
+      tool.name,
+      { description: tool.description, inputSchema: tool.schema },
+      tool.func,
+    );
+  }
+}
+```
+
+Call `registerDocumentTools(server)` during setup. Use your own validation and publishing handlers in place of the heading check and local file write.
 
 Handlers return normal MCP results. An `isError: true` result produces no completion evidence. Refusals return `isError: true` with `code: message` text.
 

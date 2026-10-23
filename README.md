@@ -1,10 +1,7 @@
 # baton
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo.svg" alt="baton" height="144">
-  </picture>
+  <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo.png" alt="baton" width="96" height="144">
 </p>
 
 **Enforce tool dependencies without building another agent framework.**

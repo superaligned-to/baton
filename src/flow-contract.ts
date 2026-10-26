@@ -58,6 +58,7 @@ export interface FlowGraph {
     ttl: number;
     dependencies: string[];
     next: string[];
+    branch: { pass: string; fail: string } | null;
     inputs: Record<string, { tool: string; output: string }>;
   }[];
 }
@@ -238,6 +239,8 @@ export type StepBuilder<
   : UndescribedStep<Flow, Name, Rule, Mcp, Dependency>;
 
 export interface Flow<Name extends string, Mcp extends boolean = false> {
+  readonly name: Name;
+
   step<const Tool extends string, const Rule extends StepOptions<Name> = Record<never, never>>(
     name: Tool,
     options?: Rule,
@@ -245,6 +248,8 @@ export interface Flow<Name extends string, Mcp extends boolean = false> {
   ): StepBuilder<Name, Tool, Rule, Mcp>;
 
   status(args: { proof_token: ProofInput }): Promise<Mcp extends true ? TextResult : Status>;
+
+  graph(): FlowGraph;
 
   list(args: { proof_token: ProofInput }): Promise<Mcp extends true ? TextResult : FlowGraph>;
 

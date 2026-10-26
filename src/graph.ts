@@ -72,6 +72,8 @@ export const createGraph = (
         step.route === null
           ? children(step).map((child) => child.name)
           : [step.route.pass.name, step.route.fail.name],
+      branch:
+        step.route === null ? null : { pass: step.route.pass.name, fail: step.route.fail.name },
       inputs: Object.fromEntries(
         [...step.links].map(([key, link]) => [key, { tool: link.source.name, output: link.id }]),
       ),

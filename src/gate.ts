@@ -64,7 +64,7 @@ export const createEngine = <const Name extends string>(
     entrySteps,
     guidance,
     locked,
-    snapshot: graph,
+    snapshot,
     required,
     ready,
     frontier,
@@ -82,6 +82,14 @@ export const createEngine = <const Name extends string>(
   const mutable = (): void => {
     if (sealed) {
       fail("declare the complete flow before calling tools");
+    }
+  };
+
+  const editable = (record: RecordStep, message: string): void => {
+    mutable();
+
+    if (record.bound) {
+      fail(message);
     }
   };
 
@@ -118,7 +126,7 @@ export const createEngine = <const Name extends string>(
 
       graphDigest = hash(
         JSON.stringify({
-          graph: graph(),
+          graph: snapshot(),
           selectors: [...records.values()].map((step) =>
             [...step.outputs].map(([id, selector]) => [step.name, id, String(selector)]),
           ),
@@ -312,11 +320,7 @@ export const createEngine = <const Name extends string>(
   };
 
   const depend = (record: RecordStep, dependencies: unknown[]): void => {
-    mutable();
-
-    if (record.bound) {
-      fail("finished steps cannot change dependencies");
-    }
+    editable(record, "finished steps cannot change dependencies");
 
     if (dependencies.length === 0) {
       fail("dependsOn needs at least one finished step");
@@ -328,11 +332,7 @@ export const createEngine = <const Name extends string>(
   };
 
   const description = (record: RecordStep, value: string): void => {
-    mutable();
-
-    if (record.bound) {
-      fail("finished steps cannot change descriptions");
-    }
+    editable(record, "finished steps cannot change descriptions");
 
     if (typeof value !== "string" || value.trim() === "") {
       fail("description must be a nonempty string");
@@ -342,11 +342,7 @@ export const createEngine = <const Name extends string>(
   };
 
   const schema = (record: RecordStep, shape: unknown, injected: Record<string, unknown>): void => {
-    mutable();
-
-    if (record.bound) {
-      fail("finished steps cannot change schemas");
-    }
+    editable(record, "finished steps cannot change schemas");
 
     if (record.schema !== null) {
       fail("a schema is already attached to this step");
@@ -366,11 +362,7 @@ export const createEngine = <const Name extends string>(
   };
 
   const bind = (record: RecordStep, handler: unknown): void => {
-    mutable();
-
-    if (record.bound) {
-      fail("a step can only bind one handler");
-    }
+    editable(record, "a step can only bind one handler");
 
     if (locked(record) && record.dependencies.size === 0) {
       fail("a locked step needs a prerequisite");
@@ -441,10 +433,16 @@ export const createEngine = <const Name extends string>(
 
   const status = async (args: ProofArguments): Promise<Status> => statusData(readMeta(args));
 
+  const graph = (): FlowGraph => {
+    seal();
+
+    return snapshot();
+  };
+
   const list = async (args: ProofArguments): Promise<FlowGraph> => {
     readMeta(args);
 
-    return graph();
+    return snapshot();
   };
 
   const refresh = async (args: ProofArguments): Promise<Status & { proof_token: string }> => {
@@ -493,6 +491,7 @@ export const createEngine = <const Name extends string>(
     },
     execute,
     status,
+    graph,
     list,
     refresh,
     mcpMeta,

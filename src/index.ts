@@ -3,6 +3,17 @@ import { createEngine } from "./gate.ts";
 import { createMcpBinder, createPlainBinder, createSteps } from "./step-builder.ts";
 
 export type {
+  Catalog,
+  CatalogArguments,
+  CatalogOptions,
+  CatalogTool,
+  WorkflowFormat,
+  WorkflowList,
+  WorkflowSource,
+  WorkflowSummary,
+} from "./catalog.ts";
+export { catalog } from "./catalog.ts";
+export type {
   BoundStep,
   Config,
   Flow,
@@ -35,16 +46,20 @@ export function baton<const Name extends string>(
 
   if (config.mcp) {
     return {
+      name: config.name,
       step: createSteps(engine, createMcpBinder(engine)),
       status: (args) => engine.mcpMeta(() => engine.status(args)),
+      graph: engine.graph,
       list: (args) => engine.mcpMeta(() => engine.list(args)),
       refresh: (args) => engine.mcpMeta(() => engine.refresh(args)),
     };
   }
 
   return {
+    name: config.name,
     step: createSteps(engine, createPlainBinder(engine)),
     status: engine.status,
+    graph: engine.graph,
     list: engine.list,
     refresh: engine.refresh,
   };

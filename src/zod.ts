@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  type Catalog,
+  type CatalogArguments,
+  type CatalogOptions,
+  catalog as createCatalog,
+  type WorkflowSource,
+} from "./catalog.ts";
 import type {
   BindRequirement,
   BoundStep,
@@ -285,8 +292,10 @@ export function baton<const Name extends string>(
 
   if (config.mcp) {
     return {
+      name: config.name,
       step: createSteps(engine, createMcpBinder(engine), proof),
       status: (args) => engine.mcpMeta(() => engine.status(args)),
+      graph: engine.graph,
       list: (args) => engine.mcpMeta(() => engine.list(args)),
       refresh: (args) => engine.mcpMeta(() => engine.refresh(args)),
       metaTools: () => metaTools(engine, proof),
@@ -294,13 +303,60 @@ export function baton<const Name extends string>(
   }
 
   return {
+    name: config.name,
     step: createSteps(engine, createPlainBinder(engine), proof),
     status: engine.status,
+    graph: engine.graph,
     list: engine.list,
     refresh: engine.refresh,
     metaTools: () => metaTools(engine, proof),
   };
 }
+
+export type ZodCatalogTool = {
+  readonly name: string;
+  readonly description: string;
+  readonly schema: {
+    readonly workflow: z.ZodOptional<z.ZodString>;
+    readonly format: z.ZodOptional<z.ZodEnum<{ json: "json"; mermaid: "mermaid" }>>;
+  };
+  readonly func: (args: CatalogArguments) => Promise<TextResult>;
+};
+
+export type ZodCatalog = Omit<Catalog, "tool"> & { tool(): ZodCatalogTool };
+
+export const catalog = (
+  workflows: readonly WorkflowSource[],
+  options: CatalogOptions = {},
+): ZodCatalog => {
+  const base = createCatalog(workflows, options);
+  const tool = base.tool();
+
+  return {
+    name: base.name,
+    list: base.list,
+    graph: base.graph,
+    describe: base.describe,
+    tool: () => ({
+      name: tool.name,
+      description: tool.description,
+      schema: {
+        workflow: z.string().optional().describe("Workflow name; omit to list every workflow."),
+        format: z.enum(["json", "mermaid"]).optional().describe("Graph format; defaults to json."),
+      },
+      func: tool.func,
+    }),
+  };
+};
+
+export type {
+  CatalogArguments,
+  CatalogOptions,
+  WorkflowFormat,
+  WorkflowList,
+  WorkflowSource,
+  WorkflowSummary,
+} from "./catalog.ts";
 
 export type { Config, FlowGraph, NextStep, Reply, Status } from "./flow-contract.ts";
 

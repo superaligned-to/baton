@@ -68,6 +68,8 @@ export interface Engine<Name extends string> {
 
   status(args: ProofArguments): Promise<Status>;
 
+  graph(): FlowGraph;
+
   list(args: ProofArguments): Promise<FlowGraph>;
 
   refresh(args: ProofArguments): Promise<Status & { proof_token: string }>;

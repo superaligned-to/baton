@@ -1,10 +1,9 @@
 import { z } from "zod";
 import {
-  type Catalog,
   type CatalogArguments,
-  type CatalogOptions,
   catalog as createCatalog,
-  type WorkflowSource,
+  registeredWorkflows,
+  registerWorkflow,
 } from "./catalog.ts";
 import type {
   BindRequirement,
@@ -212,11 +211,17 @@ class ReadyStep<
   };
 }
 
+export type MetaSchema = {
+  readonly proof_token?: TokenField;
+  readonly workflow?: z.ZodOptional<z.ZodString>;
+  readonly format?: z.ZodOptional<z.ZodEnum<{ json: "json"; mermaid: "mermaid" }>>;
+};
+
 export interface MetaTool {
   readonly name: string;
   readonly description: string;
-  readonly schema: { proof_token: TokenField };
-  readonly func: (args: ProofArguments, extra?: unknown) => Promise<TextResult>;
+  readonly schema: MetaSchema;
+  readonly func: (args: ProofArguments & CatalogArguments, extra?: unknown) => Promise<TextResult>;
 }
 
 type ZodSteps<Name extends string, Mcp extends boolean> = <
@@ -258,11 +263,25 @@ const createSteps =
       proof,
     );
 
+const workflowTool = <Name extends string>(engine: Engine<Name>): MetaTool => {
+  const name = `${engine.prefix}workflows`;
+
+  return {
+    name,
+    description: "List available workflows, or read one workflow graph as JSON or Mermaid.",
+    schema: {
+      workflow: z.string().optional().describe("Workflow name; omit to list every workflow."),
+      format: z.enum(["json", "mermaid"]).optional().describe("Graph format; defaults to json."),
+    },
+    func: (args) => createCatalog(registeredWorkflows(), { name }).tool().func(args),
+  };
+};
+
 const metaTools = <Name extends string>(
   engine: Engine<Name>,
   proof: TokenField,
-): readonly MetaTool[] =>
-  (["status", "list", "refresh"] as const).map((kind) => ({
+): readonly MetaTool[] => {
+  const tools: MetaTool[] = (["status", "list", "refresh"] as const).map((kind) => ({
     name: engine.prefix + kind,
     description:
       kind === "status"
@@ -273,6 +292,9 @@ const metaTools = <Name extends string>(
     schema: { proof_token: proof },
     func: (args: ProofArguments) => engine.mcpMeta(() => engine[kind](args)),
   }));
+
+  return [...tools, workflowTool(engine)];
+};
 
 export function baton<const Name extends string>(
   config: Config<Name, true> & { mcp: true },
@@ -290,73 +312,30 @@ export function baton<const Name extends string>(
     .optional()
     .describe(`The proof_token returned by a tool in ${config.name}.`);
 
-  if (config.mcp) {
-    return {
-      name: config.name,
-      step: createSteps(engine, createMcpBinder(engine), proof),
-      status: (args) => engine.mcpMeta(() => engine.status(args)),
-      graph: engine.graph,
-      list: (args) => engine.mcpMeta(() => engine.list(args)),
-      refresh: (args) => engine.mcpMeta(() => engine.refresh(args)),
-      metaTools: () => metaTools(engine, proof),
-    };
-  }
+  const flow: ZodFlow<Name, true> | ZodFlow<Name, false> = config.mcp
+    ? {
+        name: config.name,
+        step: createSteps(engine, createMcpBinder(engine), proof),
+        status: (args) => engine.mcpMeta(() => engine.status(args)),
+        graph: engine.graph,
+        list: (args) => engine.mcpMeta(() => engine.list(args)),
+        refresh: (args) => engine.mcpMeta(() => engine.refresh(args)),
+        metaTools: () => metaTools(engine, proof),
+      }
+    : {
+        name: config.name,
+        step: createSteps(engine, createPlainBinder(engine), proof),
+        status: engine.status,
+        graph: engine.graph,
+        list: engine.list,
+        refresh: engine.refresh,
+        metaTools: () => metaTools(engine, proof),
+      };
 
-  return {
-    name: config.name,
-    step: createSteps(engine, createPlainBinder(engine), proof),
-    status: engine.status,
-    graph: engine.graph,
-    list: engine.list,
-    refresh: engine.refresh,
-    metaTools: () => metaTools(engine, proof),
-  };
+  registerWorkflow(flow);
+
+  return flow;
 }
-
-export type ZodCatalogTool = {
-  readonly name: string;
-  readonly description: string;
-  readonly schema: {
-    readonly workflow: z.ZodOptional<z.ZodString>;
-    readonly format: z.ZodOptional<z.ZodEnum<{ json: "json"; mermaid: "mermaid" }>>;
-  };
-  readonly func: (args: CatalogArguments) => Promise<TextResult>;
-};
-
-export type ZodCatalog = Omit<Catalog, "tool"> & { tool(): ZodCatalogTool };
-
-export const catalog = (
-  workflows: readonly WorkflowSource[],
-  options: CatalogOptions = {},
-): ZodCatalog => {
-  const base = createCatalog(workflows, options);
-  const tool = base.tool();
-
-  return {
-    name: base.name,
-    list: base.list,
-    graph: base.graph,
-    describe: base.describe,
-    tool: () => ({
-      name: tool.name,
-      description: tool.description,
-      schema: {
-        workflow: z.string().optional().describe("Workflow name; omit to list every workflow."),
-        format: z.enum(["json", "mermaid"]).optional().describe("Graph format; defaults to json."),
-      },
-      func: tool.func,
-    }),
-  };
-};
-
-export type {
-  CatalogArguments,
-  CatalogOptions,
-  WorkflowFormat,
-  WorkflowList,
-  WorkflowSource,
-  WorkflowSummary,
-} from "./catalog.ts";
 
 export type { Config, FlowGraph, NextStep, Reply, Status } from "./flow-contract.ts";
 

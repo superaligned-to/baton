@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { baton, catalog } from "@superaligned/baton/zod";
+import { baton } from "@superaligned/baton/zod";
 
 const reply = <Data extends Record<string, unknown>>(data: Data) => ({
   structuredContent: data,
@@ -32,15 +32,21 @@ const configure = (secret: string) => {
     .schema({})
     .func(() => reply({ built: true }));
 
-  const workflows = catalog([documents, releases]);
-  const tool = workflows.tool();
   const server = new McpServer({ name: "catalog", version: "0.1.0" });
 
   server.registerTool(
-    tool.name,
-    { description: tool.description, inputSchema: tool.schema },
-    tool.func,
+    read.name,
+    { description: read.description, inputSchema: read.schema },
+    read.func,
   );
+
+  documents.metaTools().forEach((tool) => {
+    server.registerTool(
+      tool.name,
+      { description: tool.description, inputSchema: tool.schema },
+      tool.func,
+    );
+  });
 
   return server;
 };

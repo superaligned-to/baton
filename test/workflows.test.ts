@@ -73,6 +73,7 @@ describe("document publishing example", () => {
         "baton_status",
         "baton_list",
         "baton_refresh",
+        "baton_workflows",
       ]),
     );
     expect(

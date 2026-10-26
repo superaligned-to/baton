@@ -243,13 +243,21 @@ export function registerDocumentTools(server: McpServer) {
     check.func,
   );
 
-  for (const tool of [publish, ...flow.metaTools()]) {
+  for (const tool of [check, publish]) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.schema },
       tool.func,
     );
   }
+
+  flow.metaTools().forEach((tool) => {
+    server.registerTool(
+      tool.name,
+      { description: tool.description, inputSchema: tool.schema },
+      tool.func,
+    );
+  });
 }
 ```
 
@@ -276,27 +284,13 @@ Refusals include an error code and instructions to continue.
 | `flow.status` | `baton_status` | Completions, evidence, next inputs, remaining token lifetime |
 | `flow.list` | `baton_list` | Tool graph and entry tools |
 | `flow.refresh` | `baton_refresh` | Renewed token within `grace`; prerequisite lifetimes stay unchanged |
+| `flow.graph` | `baton_workflows` | Registered workflows, or one graph as JSON or Mermaid; no token |
 
-Each accepts a token or compatible token array through `proof_token`. Status and list require an unexpired token. Expired prerequisites must run again. With `namespace: "docs"`, meta-tool names use the `baton_docs_` prefix.
+Status, list, and refresh accept a token or compatible token array through `proof_token`. Status and list require an unexpired token. Expired prerequisites must run again. With `namespace: "docs"`, meta-tool names use the `baton_docs_` prefix.
 
 ### Workflow catalog
 
-`flow.list` reads one flow and requires a token. To expose every flow served by a process, collect them in a catalog:
-
-```ts
-import { catalog } from "@superaligned/baton/zod";
-
-const workflows = catalog([documentFlow, releaseFlow]);
-const tool = workflows.tool();
-
-server.registerTool(
-  tool.name,
-  { description: tool.description, inputSchema: tool.schema },
-  tool.func,
-);
-```
-
-The `baton_workflows` tool accepts two optional arguments:
+`flow.list` reads one flow and requires a token. The Zod adapter's `metaTools()` also returns `baton_workflows`, which lists every flow created in the process and exposes one graph as JSON or Mermaid. It needs no proof token.
 
 | Argument | Values | Use |
 | --- | --- | --- |
@@ -305,7 +299,7 @@ The `baton_workflows` tool accepts two optional arguments:
 
 JSON without `workflow` returns each workflow's entry tools and step count. JSON with `workflow` returns the full graph, including dependencies, links, and branch targets. Mermaid returns a `flowchart` with sequential edges and labeled pass/fail branches. The catalog requires no proof token because it exposes structure, never evidence.
 
-Use `catalog` from `@superaligned/baton` for a JSON Schema, and `flow.graph()` for token-free access to one flow's graph. Pass `{ name: "baton_docs_workflows" }` to rename the tool.
+`flow.graph()` exposes one flow graph to code without a token.
 
 ## Limits
 

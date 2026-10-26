@@ -25,18 +25,6 @@ export interface CatalogArguments {
 export interface CatalogTool {
   readonly name: string;
   readonly description: string;
-  readonly inputSchema: {
-    readonly type: "object";
-    readonly properties: {
-      readonly workflow: { readonly type: "string"; readonly description: string };
-      readonly format: {
-        readonly type: "string";
-        readonly enum: readonly ["json", "mermaid"];
-        readonly description: string;
-      };
-    };
-    readonly additionalProperties: false;
-  };
   readonly func: (args: CatalogArguments) => Promise<TextResult>;
 }
 
@@ -51,6 +39,23 @@ export interface Catalog {
 export interface CatalogOptions {
   name?: string;
 }
+
+const registry = new Map<string, WorkflowSource>();
+
+export const registerWorkflow = (source: WorkflowSource): void => {
+  registry.set(source.name, source);
+};
+
+export const registeredWorkflows = (): WorkflowSource[] =>
+  [...registry.values()].filter((source) => {
+    try {
+      source.graph();
+
+      return true;
+    } catch {
+      return false;
+    }
+  });
 
 const fail = (message: string): never => {
   throw new TypeError(`baton: ${message}`);
@@ -192,21 +197,6 @@ export const catalog = (
     name,
     description:
       "List available workflows, or read one workflow graph as JSON or Mermaid. Requires no proof_token.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        workflow: {
-          type: "string",
-          description: "Workflow name; omit to list every workflow.",
-        },
-        format: {
-          type: "string",
-          enum: ["json", "mermaid"],
-          description: "Graph format; defaults to json.",
-        },
-      },
-      additionalProperties: false,
-    },
     func,
   });
 

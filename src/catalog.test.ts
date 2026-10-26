@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { catalog, type WorkflowSource } from "./catalog.ts";
+import { catalog, registeredWorkflows, registerWorkflow, type WorkflowSource } from "./catalog.ts";
 import { baton } from "./index.ts";
-import { catalog as zodCatalog } from "./zod.ts";
+import { baton as zodBaton } from "./zod.ts";
 
 const secret = "dev-only-secret-of-at-least-32-bytes";
+
+const reply = (data: Record<string, unknown>) => ({
+  structuredContent: data,
+  content: [{ type: "text" as const, text: JSON.stringify(data) }],
+});
 
 const buildFlows = () => {
   const publish = baton({ name: "publish-document", secret });
@@ -105,7 +110,6 @@ describe("workflow catalog", () => {
     const tool = catalog([flows.publish, flows.release]).tool();
 
     expect(tool.name).toBe("baton_workflows");
-    expect(tool.inputSchema.properties.format.enum).toEqual(["json", "mermaid"]);
     expect(tool.description).toContain("no proof_token");
 
     const listed = await tool.func({});
@@ -131,20 +135,60 @@ describe("workflow catalog", () => {
     expect(missing.content[0]?.text).toContain("unknown workflow absent");
   });
 
-  it("exposes a Zod schema for the MCP SDK", async () => {
-    const flows = buildFlows();
-    const workflows = zodCatalog([flows.publish, flows.release]);
-    const tool = workflows.tool();
+  it("adds the workflow catalog to metaTools", async () => {
+    buildFlows();
 
-    expect(tool.name).toBe("baton_workflows");
-    expect(tool.schema.workflow.unwrap().safeParse("publish-document").success).toBe(true);
-    expect(tool.schema.format.unwrap().safeParse("mermaid").success).toBe(true);
-    expect(tool.schema.format.unwrap().safeParse("yaml").success).toBe(false);
+    const flow = zodBaton({ name: "meta", secret, mcp: true });
 
-    const diagram = await tool.func({ workflow: "publish-document", format: "mermaid" });
+    flow
+      .step("start")
+      .description("Start the flow.")
+      .schema({})
+      .func(() => reply({ started: true }));
+
+    const tools = flow.metaTools();
+    const names = tools.map((tool) => tool.name);
+
+    expect(names).toEqual(["baton_status", "baton_list", "baton_refresh", "baton_workflows"]);
+
+    const tool = tools.find((item) => item.name === "baton_workflows");
+
+    if (tool === undefined) {
+      throw new Error("Expected a workflow catalog tool.");
+    }
+
+    expect(tool.schema.workflow?.unwrap().safeParse("publish-document").success).toBe(true);
+    expect(tool.schema.format?.unwrap().safeParse("mermaid").success).toBe(true);
+    expect(tool.schema.format?.unwrap().safeParse("yaml").success).toBe(false);
+
+    const listed = await tool.func({});
+
+    expect(JSON.parse(listed.content[0]?.text ?? "")).toMatchObject({
+      workflows: expect.arrayContaining([
+        expect.objectContaining({ name: "publish-document" }),
+        expect.objectContaining({ name: "release" }),
+        expect.objectContaining({ name: "meta" }),
+      ]),
+    });
+
+    const diagram = await tool.func({ workflow: "meta", format: "mermaid" });
 
     expect(diagram.content[0]?.text).toContain("flowchart LR");
-    expect(workflows.graph("release")).toMatchObject({ flow: "release" });
+  });
+
+  it("skips registered workflows that cannot produce a graph", () => {
+    buildFlows();
+    registerWorkflow({
+      name: "partial",
+      graph: () => {
+        throw new TypeError("unfinished");
+      },
+    });
+
+    const names = registeredWorkflows().map((source) => source.name);
+
+    expect(names).toContain("publish-document");
+    expect(names).not.toContain("partial");
   });
 
   it("refuses invalid configuration and arguments", async () => {

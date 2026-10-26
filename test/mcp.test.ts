@@ -139,6 +139,7 @@ describe("MCP wrapper", () => {
       "baton_status",
       "baton_list",
       "baton_refresh",
+      "baton_workflows",
     ]);
 
     const tool = listed.tools.find((item) => item.name === "deploy");
@@ -247,17 +248,25 @@ describe("MCP wrapper", () => {
     expect(messages(changed)).toMatch(/^input_mismatch:/);
   });
 
-  it("gates all meta tools and can namespace them without losing baton_", async () => {
+  it("namespaces meta tools and keeps gated ones gated", async () => {
     const client = await setup("deploy");
     const list = await client.listTools();
 
     expect(list.tools.map((tool) => tool.name)).toContain("baton_deploy_status");
+    expect(list.tools.map((tool) => tool.name)).toContain("baton_deploy_workflows");
 
     for (const name of ["baton_deploy_status", "baton_deploy_list", "baton_deploy_refresh"]) {
       const refused = await client.callTool({ name, arguments: {} });
 
       expect(messages(refused)).toMatch(/^token_required:/);
     }
+
+    const workflows = await client.callTool({ name: "baton_deploy_workflows", arguments: {} });
+
+    expect(workflows.isError).not.toBe(true);
+    expect(workflows.structuredContent).toMatchObject({
+      workflows: expect.arrayContaining([expect.objectContaining({ name: "parallel" })]),
+    });
 
     const begin = await client.callTool({ name: "begin", arguments: { artifact: "a" } });
 

@@ -63,6 +63,47 @@ export interface FlowGraph {
   }[];
 }
 
+export interface Tool<
+  Args extends object = never,
+  Extra extends unknown[] = never[],
+  Result = unknown,
+> {
+  readonly name: string;
+  readonly description: string;
+  readonly func: (args: Args, ...extra: Extra) => Promise<Result>;
+}
+
+export interface FlowRef {
+  readonly name: string;
+  graph(): FlowGraph;
+}
+
+export interface ChallengeConfig<Mcp extends boolean = false> {
+  name: string;
+  description?: string;
+  mcp?: Mcp;
+}
+
+export type Locked<Result, Mcp extends boolean> = Mcp extends true ? Result | TextResult : Result;
+
+export interface Challenge<Extra extends unknown[] = unknown[], Mcp extends boolean = false> {
+  readonly name: string;
+
+  call(tool: Tool): Challenge<Extra, Mcp>;
+
+  follow(flow: FlowRef, end: Tool): Challenge<Extra, Mcp>;
+
+  check<Next extends unknown[]>(
+    fn: (args: object, ...extra: Next) => boolean | Promise<boolean>,
+  ): Challenge<Next, Mcp>;
+
+  lets(tool: string): boolean;
+
+  func<Args extends object, Result, Given extends Extra>(
+    handler: (args: Args, ...extra: Given) => Result,
+  ): (args: Args, ...extra: Given) => Promise<Locked<Awaited<Result>, Mcp>>;
+}
+
 export interface Config<Name extends string, Mcp extends boolean = false> {
   name: Name;
   secret: string;
@@ -203,6 +244,10 @@ export interface UndescribedStep<
     first: StepRef<Flow>,
     ...others: StepRef<Flow>[]
   ): UndescribedStep<Flow, Name, Rule, Mcp, true>;
+
+  withChallenge<Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): UndescribedStep<Flow, Name, Rule, Mcp, Dependency>;
 }
 
 export interface DescribedStep<
@@ -225,6 +270,10 @@ export interface DescribedStep<
     first: StepRef<Flow>,
     ...others: StepRef<Flow>[]
   ): DescribedStep<Flow, Name, Rule, Mcp, true>;
+
+  withChallenge<Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): DescribedStep<Flow, Name, Rule, Mcp, Dependency>;
 }
 
 export type StepBuilder<

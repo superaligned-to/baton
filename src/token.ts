@@ -41,7 +41,8 @@ export type ErrorCode =
   | "dependency_conflict"
   | "input_mismatch"
   | "step_out_of_order"
-  | "output_invalid";
+  | "output_invalid"
+  | "challenge_required";
 
 export class BatonError extends Error {
   override readonly name = "BatonError";

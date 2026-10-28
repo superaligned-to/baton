@@ -478,6 +478,7 @@ export const createEngine = <const Name extends string>(
   return {
     name: config.name,
     prefix,
+    now,
     step,
     depend,
     describe,

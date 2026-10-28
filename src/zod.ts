@@ -5,9 +5,11 @@ import {
   registeredWorkflows,
   registerWorkflow,
 } from "./catalog.ts";
+import { attach, register } from "./challenge.ts";
 import type {
   BindRequirement,
   BoundStep,
+  Challenge,
   CheckInputs,
   Config,
   Flow,
@@ -91,6 +93,13 @@ class BareStep<
 
     return new BareStep(this.engine, this.state, this.binder, this.proof);
   };
+  readonly withChallenge = <Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): BareStep<Name, Tool, Rule, Mcp, Dependency> => {
+    attach(this.state, this.engine, challenge);
+
+    return new BareStep(this.engine, this.state, this.binder, this.proof);
+  };
 }
 
 class DescribedStep<
@@ -120,6 +129,13 @@ class DescribedStep<
     ...dependencies: [StepRef<Name>, ...StepRef<Name>[]]
   ): DescribedStep<Name, Tool, Rule, Mcp, true> => {
     this.engine.depend(this.state.record, dependencies);
+
+    return new DescribedStep(this.engine, this.state, this.binder, this.proof);
+  };
+  readonly withChallenge = <Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): DescribedStep<Name, Tool, Rule, Mcp, Dependency> => {
+    attach(this.state, this.engine, challenge);
 
     return new DescribedStep(this.engine, this.state, this.binder, this.proof);
   };
@@ -157,6 +173,13 @@ class ShapedStep<
     ...dependencies: [StepRef<Name>, ...StepRef<Name>[]]
   ): ShapedStep<Name, Tool, Rule, Mcp, true, Shape> => {
     this.engine.depend(this.state.record, dependencies);
+
+    return new ShapedStep(this.engine, this.state, this.binder, this.proof, this.schema);
+  };
+  readonly withChallenge = <Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): ShapedStep<Name, Tool, Rule, Mcp, Dependency, Shape> => {
+    attach(this.state, this.engine, challenge);
 
     return new ShapedStep(this.engine, this.state, this.binder, this.proof, this.schema);
   };
@@ -209,6 +232,13 @@ class ReadyStep<
 
     return new ReadyStep(this.engine, this.state, this.binder, this.proof, this.schema);
   };
+  readonly withChallenge = <Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): ReadyStep<Name, Tool, Rule, Mcp, Dependency, Shape> => {
+    attach(this.state, this.engine, challenge);
+
+    return new ReadyStep(this.engine, this.state, this.binder, this.proof, this.schema);
+  };
 }
 
 export type MetaSchema = {
@@ -258,6 +288,7 @@ const createSteps =
       {
         name,
         record: engine.step(name, options),
+        locks: [],
       },
       binder,
       proof,
@@ -333,6 +364,7 @@ export function baton<const Name extends string>(
       };
 
   registerWorkflow(flow);
+  register(flow, engine);
 
   return flow;
 }

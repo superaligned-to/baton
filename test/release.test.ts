@@ -65,8 +65,8 @@ const fixture = (version = "0.1.0", notes = true) => {
     JSON.stringify({ name: "@superaligned/baton", version }),
   );
   writeFileSync(
-    join(cwd, "README.md"),
-    notes ? `### ${version} - 2026-10-23\n\n- A release.\n` : "# baton\n",
+    join(cwd, "CHANGELOG.md"),
+    notes ? `# Changelog\n\n## ${version} - 2026-10-23\n\n- A release.\n` : "# Changelog\n",
   );
 
   const preload = join(cwd, "registry.mjs");
@@ -80,7 +80,7 @@ const fixture = (version = "0.1.0", notes = true) => {
 
   git(cwd, "init", "-q");
   writeFileSync(join(cwd, ".git/info/exclude"), "output\n");
-  git(cwd, "add", "package.json", "README.md", "registry.mjs");
+  git(cwd, "add", "package.json", "CHANGELOG.md", "registry.mjs");
   git(cwd, "commit", "-qm", "Release fixture");
   git(cwd, "tag", "-a", `v${version}`, "-m", "Release fixture");
 
@@ -118,15 +118,15 @@ const fixture = (version = "0.1.0", notes = true) => {
 };
 
 describe("inline release workflow", () => {
-  const tag = "Verify the release tag and README changelog";
+  const tag = "Verify the release tag and changelog";
   const publication = "Check for an identical previous publication";
 
-  it("requires a matching tag and a clean committed README release entry", () => {
+  it("requires a matching tag and a clean committed changelog entry", () => {
     const f = fixture();
 
     expect(f.run(tag).status).toBe(0);
     expect(f.run(tag, { GITHUB_REF_NAME: "v0.2.0" }).status).not.toBe(0);
-    writeFileSync(join(f.cwd, "README.md"), "# Changed\n");
+    writeFileSync(join(f.cwd, "CHANGELOG.md"), "# Changed\n");
     expect(f.run(tag).status).not.toBe(0);
   });
 
@@ -137,7 +137,7 @@ describe("inline release workflow", () => {
     expect(f.run(tag).status).not.toBe(0);
   });
 
-  it("refuses a clean release without its dated README notes", () => {
+  it("refuses a clean release without its dated changelog entry", () => {
     const f = fixture("0.1.0", false);
 
     expect(f.run(tag).status).not.toBe(0);

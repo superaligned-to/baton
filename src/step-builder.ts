@@ -1,6 +1,8 @@
+import { admit, attach, type Lock, register } from "./challenge.ts";
 import {
   type BindRequirement,
   type BoundStep,
+  type Challenge,
   type CheckInputs,
   type DescribedStep,
   flowType,
@@ -22,10 +24,12 @@ import {
   valueType,
 } from "./flow-contract.ts";
 import type { Engine, Execution, Invocation, RecordStep } from "./step-record.ts";
+import { BatonError } from "./token.ts";
 
 export interface StepState<Tool extends string> {
   readonly name: Tool;
   readonly record: RecordStep;
+  readonly locks: Lock[];
 }
 
 export interface Binder<Name extends string, Mcp extends boolean> {
@@ -115,6 +119,7 @@ const createHandle = <
     branch: { writable: false, enumerable: false, configurable: false },
   });
   engine.handle(state.record, handle);
+  register(handle, engine);
 
   return handle;
 };
@@ -180,7 +185,13 @@ export const createPlainBinder = <Name extends string>(
     engine.bind(state.record, handler);
 
     return createHandle(engine, state, async (args, extra, evaluate) => {
-      const execution = await engine.execute(state.record, args, async (inputs) => {
+      const admitted = await admit(engine.name, state.locks, args, extra);
+
+      if (admitted instanceof BatonError) {
+        return plainReply({ kind: "refusal", error: admitted });
+      }
+
+      const execution = await engine.execute(state.record, admitted, async (inputs) => {
         return evaluate(await handler(inputs, ...extra));
       });
 
@@ -194,9 +205,18 @@ export const createMcpBinder = <Name extends string>(engine: Engine<Name>): Bind
     engine.bind(state.record, handler);
 
     return createHandle(engine, state, async (args, extra, evaluate) => {
+      const admitted = await admit(engine.name, state.locks, args, extra);
+
+      if (admitted instanceof BatonError) {
+        return mcpReply<Awaited<ReturnType<typeof handler>> & McpResult>({
+          kind: "refusal",
+          error: admitted,
+        });
+      }
+
       const execution = await engine.execute(
         state.record,
-        args,
+        admitted,
         async (inputs) => {
           return evaluate(await handler(inputs, ...extra));
         },
@@ -254,6 +274,14 @@ class InitialStep<
 
     return new InitialStep(this.engine, this.state, this.binder);
   };
+
+  readonly withChallenge = <Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): UndescribedStep<Name, Tool, Rule, Mcp, Dependency> => {
+    attach(this.state, this.engine, challenge);
+
+    return new InitialStep(this.engine, this.state, this.binder);
+  };
 }
 
 class ReadyStep<
@@ -301,6 +329,14 @@ class ReadyStep<
 
     return new ReadyStep(this.engine, this.state, this.binder);
   };
+
+  readonly withChallenge = <Extra extends unknown[], Locks extends boolean>(
+    challenge: Challenge<Extra, Locks>,
+  ): DescribedStep<Name, Tool, Rule, Mcp, Dependency> => {
+    attach(this.state, this.engine, challenge);
+
+    return new ReadyStep(this.engine, this.state, this.binder);
+  };
 }
 
 export const createSteps =
@@ -322,6 +358,7 @@ export const createSteps =
       {
         name,
         record: engine.step(name, options),
+        locks: [],
       },
       binder,
     );

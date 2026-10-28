@@ -32,7 +32,7 @@ describe("repository constraints", () => {
     expect(manifest.files).toEqual(["dist"]);
     expect(manifest.type).toBe("module");
     expect(manifest.sideEffects).toBe(false);
-    expect(manifest.engines).toEqual({ node: ">=24" });
+    expect(manifest.engines).toEqual({ node: ">=22.9" });
     expect(manifest.exports).toEqual({
       ".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
       "./zod": { types: "./dist/zod.d.ts", default: "./dist/zod.js" },

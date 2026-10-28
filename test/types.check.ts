@@ -6,7 +6,7 @@ import type {
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { baton as plain } from "../src/index.ts";
+import { challenge, baton as plain, type TextResult } from "../src/index.ts";
 import { baton } from "../src/zod.ts";
 
 const secret = "dev-only-secret-of-at-least-32-bytes";
@@ -334,3 +334,39 @@ server.registerTool(
 const sdkResult: Promise<CallToolResult> = sdkStep.func({ doc: "README.md" });
 
 void sdkResult;
+
+const proofLock = challenge({ name: "proof-lock" }).call(source);
+
+const proofGated: (args: { doc: string }, extra: Extra) => Promise<string> = proofLock.func(
+  async (_args: { doc: string }, extra: Extra) => String(extra.requestId),
+);
+
+const ctxLock = challenge({ name: "ctx-lock", description: "wait" }).check(
+  async (_args: object, ctx: { agentId: string }) => ctx.agentId !== "",
+);
+
+ctxLock.func(async (_args: object, ctx: { agentId: string }) => ctx.agentId);
+
+// @ts-expect-error
+ctxLock.func(async (_args: object, ctx: { other: number }) => ctx.other);
+
+const mcpLocked: Promise<CallToolResult | TextResult> = challenge({
+  name: "mcp-lock",
+  description: "wait",
+  mcp: true,
+})
+  .check(() => true)
+  .func(async () => reply({ ok: true }))({});
+
+const plainLocked: Promise<string> = challenge({ name: "plain-lock", description: "wait" })
+  .check(() => true)
+  .func(async () => "ok")({});
+
+flow.step("challenged").withChallenge(proofLock).description("Locked step");
+
+// @ts-expect-error
+challenge({ name: "no-end" }).follow(flow);
+
+void proofGated;
+void mcpLocked;
+void plainLocked;

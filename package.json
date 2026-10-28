@@ -1,6 +1,6 @@
 {
   "name": "@superaligned/baton",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Enforce tool dependencies with signed proofs around your existing TypeScript handlers.",
   "keywords": [
     "mcp",
@@ -32,7 +32,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=24"
+    "node": ">=22.9"
   },
   "packageManager": "pnpm@10.30.3",
   "repository": {

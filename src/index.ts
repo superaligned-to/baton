@@ -1,13 +1,20 @@
 import { registerWorkflow } from "./catalog.ts";
+import { register } from "./challenge.ts";
 import type { Config, Flow } from "./flow-contract.ts";
 import { createEngine } from "./gate.ts";
 import { createMcpBinder, createPlainBinder, createSteps } from "./step-builder.ts";
 
+export { challenge } from "./challenge.ts";
+
 export type {
   BoundStep,
+  Challenge,
+  ChallengeConfig,
   Config,
   Flow,
   FlowGraph,
+  FlowRef,
+  Locked,
   NextStep,
   OutputRef,
   ProofArguments,
@@ -18,6 +25,7 @@ export type {
   StepOptions,
   StepRef,
   TextResult,
+  Tool,
   Warning,
 } from "./flow-contract.ts";
 
@@ -53,6 +61,7 @@ export function baton<const Name extends string>(
       };
 
   registerWorkflow(flow);
+  register(flow, engine);
 
   return flow;
 }

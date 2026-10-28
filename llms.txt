@@ -6,6 +6,8 @@
 - [MCP integration](https://github.com/superaligned-to/baton/blob/main/README.md#mcp): schemas, handlers, and explicit meta-tool registration
 - [API](https://github.com/superaligned-to/baton/blob/main/README.md#api): configuration, step builders, output links, and replies
 - [Calling gated tools](https://github.com/superaligned-to/baton/blob/main/README.md#calling-gated-tools): proof tokens, refusals, and recovery
+- [Challenges](https://github.com/superaligned-to/baton/blob/main/README.md#challenges): lock tools until the agent calls a tool, completes a flow, or a check passes
 - [Workflow catalog](https://github.com/superaligned-to/baton/blob/main/README.md#workflow-catalog): list every flow and read its graph as JSON or Mermaid
 - [Versioning](https://github.com/superaligned-to/baton/blob/main/README.md#versioning): release compatibility
+- [Changelog](https://github.com/superaligned-to/baton/blob/main/CHANGELOG.md): release notes
 - [Agent instructions](https://github.com/superaligned-to/baton/blob/main/AGENTS.md): repository constraints

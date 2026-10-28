@@ -25,7 +25,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Install the pinned npm CLI with trusted publishing support
         run: npm install --global npm@11.20.0 --registry=https://registry.npmjs.org
-      - name: Verify the release tag and README changelog
+      - name: Verify the release tag and changelog
         run: |
           node --input-type=module <<'NODE'
           import assert from "node:assert/strict";
@@ -48,12 +48,12 @@ jobs:
             git("rev-parse", "HEAD"),
           );
 
-          const prefix = `### ${version} - `;
-          const headings = readFileSync("README.md", "utf8")
+          const prefix = `## ${version} - `;
+          const headings = readFileSync("CHANGELOG.md", "utf8")
             .split(/\r?\n/)
             .filter((line) => line.startsWith(prefix));
 
-          assert.equal(headings.length, 1, "README.md needs one dated changelog entry for this version.");
+          assert.equal(headings.length, 1, "CHANGELOG.md needs one dated entry for this version.");
           assert.match(headings[0].slice(prefix.length), /^\d{4}-\d{2}-\d{2}$/);
           NODE
       - name: Require the release commit to be on main

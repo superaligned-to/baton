@@ -20,12 +20,12 @@ Agents can skip steps. Your tools don’t have to let them.
 - Bind publishing to the exact artifact that passed its checks.
 
 > [!NOTE]
-> **For agents:** [MCP integration](#mcp) · [Calling gated tools](#calling-gated-tools) · [Repo instructions](AGENTS.md) · [Docs index](llms.txt).
+> **For agents:** [MCP integration](#mcp) · [Calling gated tools](#calling-gated-tools) · [Challenges](#calling-challenged-tools) · [Repo instructions](AGENTS.md) · [Docs index](llms.txt).
 > Keep the existing server and handlers. Pass `proof_token` unchanged and follow the reply’s `Next:` guidance.
 
 ## Install
 
-Requires **Node 24+**. [Available on npm](https://www.npmjs.com/package/@superaligned/baton).
+Requires **Node 22.9+**. [Available on npm](https://www.npmjs.com/package/@superaligned/baton).
 
 | Package manager | Command |
 | --- | --- |
@@ -265,6 +265,198 @@ Call `registerDocumentTools(server)` during setup. Use your own validation and p
 
 Handlers return normal MCP results. An `isError: true` result produces no completion evidence. Refusals return `isError: true` with `code: message` text.
 
+## Challenges
+
+A challenge locks a tool until the agent does something first: call a tool, complete a flow, or wait for a condition your application checks. While the challenge is unsolved, baton refuses the call before the handler runs, and the refusal says how to unlock it.
+
+```ts
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { challenge } from "@superaligned/baton";
+import { baton } from "@superaligned/baton/zod";
+import { z } from "zod";
+
+type Extra = { authInfo?: AuthInfo };
+
+const store = { inbox: new Map<string, string[]>(), docs: [] as string[], freeze: false };
+
+const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
+const caller = (extra: Extra): string => extra.authInfo?.clientId ?? "anonymous";
+
+export function registerDocumentTools(server: McpServer) {
+  const secret = process.env.BATON_SECRET ?? "";
+
+  const handbook = baton({ name: "handbook", secret, mcp: true });
+
+  const readRules = handbook
+    .step("read_rules")
+    .description("Read the writing rules.")
+    .schema({})
+    .func(async () => text("Write for the next reader."));
+
+  const readInbox = {
+    name: "read_inbox",
+    description: "Read your unread messages. Marks them read.",
+    schema: {},
+    func: async (_args: object, extra: Extra) => {
+      const mail = store.inbox.get(caller(extra)) ?? [];
+
+      store.inbox.delete(caller(extra));
+
+      return text(JSON.stringify(mail));
+    },
+  };
+
+  const inboxRead = challenge({ name: "read-inbox", mcp: true })
+    .call(readInbox)
+    .check(async (_args: object, extra: Extra) => !store.inbox.has(caller(extra)));
+
+  const rulesRead = challenge({ name: "read-rules", mcp: true }).call(readRules);
+
+  const freezeOver = challenge({
+    name: "release-freeze",
+    description: "wait until the release freeze ends",
+    mcp: true,
+  }).check(async () => !store.freeze);
+
+  const publishing = baton({ name: "publish-document", secret, mcp: true });
+
+  const check = publishing
+    .step("check_doc")
+    .withChallenge(inboxRead)
+    .description("Check that the document starts with a Markdown heading.")
+    .schema({ text: z.string() })
+    .func(({ text: body }) => ({
+      ...text("Document checked."),
+      structuredContent: { text: body, passed: body.startsWith("# ") },
+    }));
+
+  const publish = publishing
+    .step("publish_doc", { from: { text: check.output((r) => r.structuredContent.text) } })
+    .withChallenge(rulesRead)
+    .withChallenge(freezeOver)
+    .description("Publish the exact text that passed its check.")
+    .schema({ text: z.string() })
+    .func(async ({ text: body }) => {
+      store.docs.push(body);
+
+      return text("Document published.");
+    });
+
+  check.branch({ when: (r) => r.structuredContent.passed, pass: publish, fail: check });
+
+  const list = {
+    name: "list_docs",
+    description: "List published documents.",
+    schema: {},
+    func: inboxRead.func(async (_args: object, _extra: Extra) => text(JSON.stringify(store.docs))),
+  };
+
+  for (const tool of [readInbox, list]) {
+    server.registerTool(tool.name, { description: tool.description, inputSchema: tool.schema }, tool.func);
+  }
+
+  for (const tool of [readRules, check, publish]) {
+    server.registerTool(tool.name, { description: tool.description, inputSchema: tool.schema }, tool.func);
+  }
+
+  for (const tool of publishing.metaTools()) {
+    server.registerTool(tool.name, { description: tool.description, inputSchema: tool.schema }, tool.func);
+  }
+}
+```
+
+The example uses each kind of challenge. `read-inbox` names `read_inbox` and is solved when the caller's inbox is empty; it locks `check_doc` and the plain `list_docs` handler. `read-rules` is solved by proof that `read_rules` ran, and that proof comes from the `handbook` flow. `release-freeze` has no tool to call and is solved when the freeze ends.
+
+An agent's session:
+
+```text
+check_doc { "text": "# Release notes" }
+→ challenge_required: This tool is locked by challenge: read-inbox. Solve it to unlock: call read_inbox.
+
+read_inbox {}
+→ ["Use the new template."]
+
+check_doc { "text": "# Release notes" }
+→ Document checked.
+  proof_token: bt1.publish-document.check_doc>publish_doc.…
+  Next: publish_doc {"text":"# Release notes"}. Pass the proof_token.
+
+publish_doc { "text": "# Release notes", "proof_token": "<A>" }
+→ challenge_required: This tool is locked by challenge: read-rules. Solve it to unlock: call read_rules.
+
+read_rules {}
+→ Write for the next reader.
+  proof_token: bt1.handbook.read_rules>~.…
+  This flow is finished.
+
+publish_doc { "text": "# Release notes", "proof_token": ["<A>", "<R>"] }
+→ challenge_required: This tool is locked by challenge: release-freeze. Solve it to unlock: wait until the release freeze ends.
+
+publish_doc { "text": "# Release notes", "proof_token": ["<A>", "<R>"] }
+→ Document published.
+```
+
+### How proof moves between flows
+
+A proof token is a signed receipt that a step ran, and its header names the flow that signed it. A step with challenges sorts the tokens it receives by that flow. Each challenge checks the receipts from its own flow with that flow's engine, and the step's engine sees only the step's own tokens, as before. Baton stores nothing: a challenge is solved by a valid receipt or by its check.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Agent
+  participant RR as read_rules (handbook flow)
+  participant PD as publish_doc + read-rules challenge
+  participant HB as handbook engine
+  participant PE as publish-document engine
+
+  Agent->>PD: publish_doc { text, proof_token: A }
+  PD->>PD: read-rules challenge looks for a token from flow "handbook"
+  PD-->>Agent: challenge_required: call read_rules
+
+  Agent->>RR: read_rules {}
+  RR->>HB: step ran, sign a receipt
+  HB-->>Agent: rules + proof_token R ("read_rules ran", valid 15 min)
+
+  Agent->>PD: publish_doc { text, proof_token: [A, R] }
+  PD->>PD: split tokens by the flow in their header: A is publish-document, R is handbook
+  PD->>HB: verify R: signature, not expired, holds read_rules
+  HB-->>PD: valid
+  Note over PD: read-rules solved. Baton stores nothing.
+  PD->>PE: verify A as before: own flow, publish_doc allowed next, text matches
+  PE-->>PD: valid
+  PD->>PD: run the handler
+  PD-->>Agent: Document published + proof_token P
+```
+
+R stays out of P, so the next publish shows R again while it is valid. When R expires (the `read_rules` step's `ttl`), the challenge locks again.
+
+### Challenge API
+
+| Call | Use |
+| --- | --- |
+| `challenge({ name, description?, mcp? })` | Start a challenge. `description` replaces the instruction in the refusal. `mcp: true` makes `.func()` return refusals as MCP results. |
+| `.call(tool)` | The agent must call `tool`. It stays callable while the challenge is unsolved. |
+| `.follow(flow, end)` | The agent must complete `flow` by reaching its step `end`. Every step of `flow` stays callable while the challenge is unsolved. |
+| `.check(fn)` | Async callback that receives the call's arguments and extra parameters and returns `true` when solved. It runs on every call. |
+| `.func(fn)` | Lock a plain handler behind the challenge. |
+| `.lets(name)` | `true` for the tools that stay callable while the challenge is unsolved. |
+| `step.withChallenge(c)` | Lock a step. Challenges run in the order attached, before the step's own proof checks. A challenge cannot name the step's own flow; use `dependsOn` for that. |
+
+| Challenge | Solved when |
+| --- | --- |
+| `.call(tool)` | The call's `proof_token` proves `tool` ran and that proof is not expired |
+| `.follow(flow, end)` | The call's `proof_token` proves `end` ran and that proof is not expired |
+| Any challenge with `.check(fn)` | `fn` returns `true`; proof is not needed |
+
+A challenge needs `.check()` unless it calls a baton step or follows a baton flow, and it needs a description unless it calls or follows something. It takes one `.call()` or `.follow()` and one `.check()`. `.func()` locks every handler it wraps, including the challenge's own tool, so wrap only the handlers whose name `.lets()` rejects. A `.follow()` challenge reads its flow's graph when it explains itself or answers `.lets()`, so finish defining that flow first. To receive proof, a plain handler wrapped with `.func()` needs `proof_token` in its input schema.
+
+### Calling challenged tools
+
+1. On `challenge_required`, do what the refusal says, then retry the same call.
+2. Pass proof from another flow together with the call's own token, as a `proof_token` array.
+3. A challenge that only checks state is solved by the application. Retry once the condition changes.
+
 ## Calling gated tools
 
 1. Call an entry tool.
@@ -309,6 +501,8 @@ JSON without `workflow` returns each workflow's entry tools and step count. JSON
 - Tokens carry state and can be replayed until expiry. Issuing a new token does not revoke old ones.
 - Your application checks whether an artifact is still current and prevents duplicate side effects.
 - Linked values are readable in the token. Keep secrets out of them.
+- A challenge solved by proof accepts any valid token from any caller until it expires. Use `.check()` when the challenge must hold for one agent.
+- `.check()` receives the call's arguments before baton verifies them. Trust only what your server puts in the extra parameters.
 
 ## Versioning
 
@@ -316,8 +510,6 @@ During `0.x`, breaking changes bump the minor version and compatible fixes bump 
 
 ## Changelog
 
-### 0.1.0 - 2026-10-23
-
-- Initial release.
+See [CHANGELOG.md](CHANGELOG.md).
 
 [MIT license](LICENSE). [Report a bug](https://github.com/superaligned-to/baton/issues).

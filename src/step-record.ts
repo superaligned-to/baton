@@ -38,6 +38,8 @@ export interface Engine<Name extends string> {
   readonly name: Name;
   readonly prefix: string;
 
+  now(): number;
+
   step(name: string, options?: RuntimeOptions): RecordStep;
 
   depend(step: RecordStep, dependencies: unknown[]): void;

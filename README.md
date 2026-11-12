@@ -1,8 +1,9 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo.png" alt="baton" width="120" height="120">
+  <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo.png" alt="baton" width="120" height="120"><br>
+  baton
 </h1>
 
-Agents can skip steps. Your tools don’t have to let them.
+Give an agent a tool and sooner or later it will skip the steps before it. baton checks that those steps happened before your handler runs.
 
 - Require a read before an edit.
 - Require tests and review before a release.

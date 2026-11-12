@@ -9,6 +9,18 @@ Give an agent a tool and sooner or later it will skip the steps before it. baton
 - Require tests and review before a release.
 - Bind publishing to the exact artifact that passed its checks.
 
+Here is a release as a graph. Each circle is a tool, and each line means the next tool needs proof from the one before it:
+
+```mermaid
+flowchart LR
+  build((build_artifact)) --> tests((test_artifact))
+  build --> review((review_artifact))
+  tests --> publish((publish_artifact))
+  review --> publish
+```
+
+`publish_artifact` refuses to run until both `test_artifact` and `review_artifact` have passed, and both checks must be about the artifact `build_artifact` produced. Skip a step or swap in a different build, and the call is refused before your handler runs.
+
 > [!NOTE]
 > **For agents:** [MCP integration](#mcp) · [Calling gated tools](#calling-gated-tools) · [Challenges](#calling-challenged-tools) · [Repo instructions](AGENTS.md) · [Docs index](llms.txt).
 > Keep the existing server and handlers. Pass `proof_token` unchanged and follow the reply’s `Next:` guidance.

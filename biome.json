@@ -21,8 +21,16 @@
     "rules": {
       "preset": "recommended",
       "style": {
+        "noNonNullAssertion": "error",
         "useBlockStatements": "error",
         "useSingleVarDeclarator": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
       }
     }
   },

@@ -1,17 +1,9 @@
-# baton
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo.png" alt="baton" width="96" height="144">
-</p>
-
-**Enforce tool dependencies without building another agent framework.**
-
-<p align="center">
+<h1 align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/workflow.png">
-    <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/workflow.gif" alt="Agents share an MCP server that requires build, test, and review before publishing." width="1040">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/banner-dark.png">
+    <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/banner-light.png" alt="baton: enforce tool dependencies without building another agent framework" width="100%">
   </picture>
-</p>
+</h1>
 
 Agents can skip steps. Your tools don’t have to let them.
 

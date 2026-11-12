@@ -15,6 +15,16 @@ The [README](README.md) contains the integration guide, API, token recovery, and
 - Keep application servers and tool registration intact; baton wraps handlers.
 - Keep secrets in environment variables. Host applications check current state and protect duplicate side effects.
 
+## Guidelines
+
+Code here follows the Superaligned guidelines. Before a change, run `treecode catalog set superaligned-to/guidelines` once, then `treecode resolve general/typescript`, and cite rules by ID in reviews.
+
+- Comments only for what the code cannot show (GEN-CS-001). Delete what the change orphans (GEN-CS-002).
+- Explicit public types. No `any`, unchecked casts or non-null assertions (GEN-CS-005); Biome enforces `any` and `!`.
+- Smallest change that does the job; no speculative options, helpers or dependencies (GEN-CS-008, GEN-CS-012).
+- Test behavior at the public contract, one test per behavior you change (GEN-CS-013).
+- Verify with `pnpm check` before calling work done, and name what you skipped (GEN-CS-014, GEN-FL-006).
+
 Biome checks TypeScript and JSON; markdownlint checks Markdown. Repository tests check package contents, source module size, and YAML, including GitHub workflows and the lockfile.
 
 ## Releasing

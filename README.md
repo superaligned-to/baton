@@ -1,8 +1,5 @@
 <h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/banner-dark.png">
-    <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/banner-light.png" alt="baton: enforce tool dependencies without building another agent framework" width="100%">
-  </picture>
+  <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/logo.png" alt="baton" width="120" height="120">
 </h1>
 
 Agents can skip steps. Your tools don’t have to let them.

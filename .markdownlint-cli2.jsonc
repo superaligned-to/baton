@@ -5,7 +5,7 @@
     "MD013": false,
     "MD024": { "siblings_only": true },
     "MD033": {
-      "allowed_elements": ["h1", "picture", "source", "img"]
+      "allowed_elements": ["h1", "img"]
     },
     "MD040": true
   }

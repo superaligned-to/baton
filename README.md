@@ -11,13 +11,9 @@ Give an agent a tool and sooner or later it will skip the steps before it. baton
 
 Here is a release as a graph. Each circle is a tool, and each line means the next tool needs proof from the one before it:
 
-```mermaid
-flowchart LR
-  build((build_artifact)) --> tests((test_artifact))
-  build --> review((review_artifact))
-  tests --> publish((publish_artifact))
-  review --> publish
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/superaligned-to/baton/main/.github/media/graph.png" alt="A release graph: build_artifact leads to test_artifact and review_artifact, and both lead to publish_artifact." width="720">
+</p>
 
 `publish_artifact` refuses to run until both `test_artifact` and `review_artifact` have passed, and both checks must be about the artifact `build_artifact` produced. Skip a step or swap in a different build, and the call is refused before your handler runs.
 
